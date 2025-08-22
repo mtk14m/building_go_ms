@@ -1,27 +1,50 @@
 package main
 
 import (
-	"fmt"
-	"io"
+	"context"
+	"github/mtk14m/working/handlers"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"time"
 )
 
 func main() {
+	l := log.New(os.Stdout, "product-api ", log.LstdFlags)
+	hh := handlers.NewHello(l)
+	hg := handlers.NewGoodbye(l)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("hello world")
-		d, err:= io.ReadAll(r.Body)
-		if err!=nil{
-			http.Error(w, "Ooops", http.StatusBadRequest)
-			return
+	sm := http.NewServeMux()
+	sm.Handle("/", hh)
+	sm.Handle("/goodbye", hg)
+
+	//setting timeout
+
+	s := &http.Server{
+		Addr:         ":9090",
+		Handler:      sm,
+		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  1 * time.Second,
+		WriteTimeout: 1 * time.Second,
+	}
+
+	//run serve go routine
+
+	go func() {
+		err := s.ListenAndServe()
+		if err != nil {
+			l.Fatal(err)
 		}
-		fmt.Fprintf(w, " hello %s\n", d)
-	})
+	}()
 
-	http.HandleFunc("/toto", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("hello toto")
-	})
+	//gracefull shutdown
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan, os.Interrupt)
+	signal.Notify(sigChan, os.Kill)
 
-	http.ListenAndServe(":9090", nil)
+	sig := <-sigChan
+	l.Println("Received terminate, gracefull shutdown", sig)
+	tc, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	s.Shutdown(tc)
 }
