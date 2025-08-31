@@ -30,11 +30,38 @@ func (p *Products) GetProducts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to marshal json", http.StatusInternalServerError)
 		return
 	}
-	p.l.Println("Get all products")
+	p.l.Println("Get all products request")
+}
+
+func (p *Products) GetProductById(w http.ResponseWriter, r *http.Request) {
+	//get id from path
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, "Unable to convert id, error in URI path", http.StatusBadRequest)
+		return
+	}
+	p.l.Println("Get product request")
+
+	product, err := data.GetProductById(id)
+	if err != nil {
+		http.Error(w, "Unable to retreave this product", http.StatusInternalServerError)
+		return
+	}
+
+	err = product.ToJSON(w)
+	if err != nil {
+        p.l.Println("[ERROR] unable to marshal json:", err)
+        http.Error(w, "Unable to marshal json", http.StatusInternalServerError)
+        return
+    }
+
+	//if ok log the product
+	//p.l.Println("get the product")
 }
 
 func (p *Products) AddProduct(w http.ResponseWriter, r *http.Request) {
-	p.l.Println("Handle POST Products")
+	p.l.Println("Create product request")
 	val := r.Context().Value(KeyProduct{})
 	product, ok := val.(*data.Product)
 	if !ok {
@@ -55,7 +82,7 @@ func (p *Products) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to convert id, error in URI path", http.StatusBadRequest)
 		return
 	}
-	p.l.Println("Handle PUT Products", id)
+	p.l.Println("Update product request")
 	val := r.Context().Value(KeyProduct{})
 	product, ok := val.(*data.Product)
 	if !ok {
@@ -86,6 +113,15 @@ func (p *Products) MiddlewareProductValidation(next http.Handler) http.Handler {
 			http.Error(w, "Unable to unmarshal json", http.StatusBadRequest)
 			return
 		}
+
+		//validate the product
+		err = product.ValidateProduct()
+		if err != nil {
+			p.l.Println("[ERROR]Product validation failed:", err)
+			http.Error(w, "Product validation failed", http.StatusBadRequest)
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), KeyProduct{}, product)
 		req := r.WithContext(ctx)
 		next.ServeHTTP(w, req)

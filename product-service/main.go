@@ -26,6 +26,10 @@ func main() {
 	getRouter := sm.Methods(http.MethodGet).Subrouter()
 	getRouter.HandleFunc("/products", productHandler.GetProducts)
 
+	// GET /products/id
+	getByIdRouter := sm.Methods(http.MethodGet).Subrouter()
+	getByIdRouter.HandleFunc("/products/{id:[0-9]+}", productHandler.GetProductById)
+
 	// POST /products (AddProduct)
 	postRouter := sm.Methods(http.MethodPost).Subrouter()
 	postRouter.HandleFunc("/products", productHandler.AddProduct)
